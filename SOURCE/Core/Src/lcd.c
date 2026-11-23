@@ -45,7 +45,7 @@ void lcd_goto(uint8_t col, uint8_t row){
 	static const uint8_t row_start[2] = { 0x00, 0x40 };
 	lcd_cmd(0x80 | (row_start[row] + col));
 }
-void lcd_init(uint8_t rows, uint8_t cols){
+void lcd_init(uint8_t cols, uint8_t rows){
 	lcd_rows = rows;
 	lcd_cols = cols;
 	HAL_Delay(50);
