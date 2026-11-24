@@ -33,7 +33,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "cli.h"
-#include "lcd.h"
+#include "communication.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -61,18 +61,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_RED_Pin GPIO_PIN_5
 #define LED_RED_GPIO_Port GPIOA
-#define RS_Pin GPIO_PIN_6
-#define RS_GPIO_Port GPIOA
-#define E_Pin GPIO_PIN_7
-#define E_GPIO_Port GPIOA
-#define D4_Pin GPIO_PIN_4
-#define D4_GPIO_Port GPIOB
-#define D5_Pin GPIO_PIN_5
-#define D5_GPIO_Port GPIOB
-#define D6_Pin GPIO_PIN_6
-#define D6_GPIO_Port GPIOB
-#define D7_Pin GPIO_PIN_7
-#define D7_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

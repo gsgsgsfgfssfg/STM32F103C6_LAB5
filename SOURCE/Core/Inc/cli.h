@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include "stm32f1xx.h"
-#include "lcd.h"
+#include "protocol.h"
+#include "communication.h"
 #include <string.h>
 
 #define CLI_BUFFER_SIZE 64

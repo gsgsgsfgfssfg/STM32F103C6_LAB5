@@ -5,6 +5,13 @@ SOURCE/**/*.d
 SOURCE/**/*.elf
 SOURCE/**/*.map
 SOURCE/**/*.su
+LAB5_LCD/Debug/
+LAB5_LCD/Release/
+LAB5_LCD/**/*.o
+LAB5_LCD/**/*.d
+LAB5_LCD/**/*.elf
+LAB5_LCD/**/*.map
+LAB5_LCD/**/*.su
 .metadata/
 *.pdsbak
 *.workspace

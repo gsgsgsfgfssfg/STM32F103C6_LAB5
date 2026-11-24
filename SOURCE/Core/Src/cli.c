@@ -146,20 +146,26 @@ uint8_t CLI_Parse(const char *input, CLI_Command *cmd)
     // Unknown command
     return 0;
 }
-void CLI_Execute(CLI_Command *cmd)
-{
-    switch (cmd->type)
-    {
+void CLI_Execute(CLI_Command *cmd){
+	Protocol_Frame_t frame;
+    switch (cmd->type){
         case CLI_CMD_CLEAR:
-            lcd_clear();
+            //lcd_clear();
+        	Protocol_InitFrame(&frame,CMD_CLEAR,0,0,NULL);
+        	Communication_Send(&frame);
             break;
 
-        case CLI_CMD_GOTO:
-            lcd_goto(cmd->col, cmd->row);
+        case CLI_CMD_GOTO:{
+            //lcd_goto(cmd->col, cmd->row);
+        	uint8_t data[2] = {cmd->col,cmd->row};
+        	Protocol_InitFrame(&frame,CMD_GOTO,0,2,data);
+        	Communication_Send(&frame);
             break;
-
+        }
         case CLI_CMD_PRINT:
-            lcd_print(cmd->text);
+            //lcd_print(cmd->text);
+        	Protocol_InitFrame(&frame,CMD_PRINT,0,strlen(cmd->text),(uint8_t*)cmd->text);
+        	Communication_Send(&frame);
             break;
 
         case CLI_CMD_HELP:
