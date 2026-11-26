@@ -1,5 +1,4 @@
 #include "communication.h"
-#include "application.h"
 
 extern UART_HandleTypeDef huart1;
 
@@ -138,8 +137,7 @@ void Communication_ErrorCallback(void)
 
 uint8_t Communication_TryReceive(Protocol_Frame_t *frame)
 {
-    if ((frame == NULL) || (frame_ready == 0U))
-    {
+    if ((frame == NULL) || (frame_ready == 0U)){
         return PROTOCOL_ERROR;
     }
 
@@ -156,8 +154,7 @@ void Communication_Process(void)
 {
     Protocol_Frame_t frame;
 
-    if (Communication_TryReceive(&frame) != PROTOCOL_OK)
-    {
+    if (Communication_TryReceive(&frame) != PROTOCOL_OK){
         return;
     }
 

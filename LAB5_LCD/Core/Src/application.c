@@ -1,12 +1,11 @@
 #include "application.h"
-#include "communication.h"
 
 /* =========================================================
  * Private Variables
  * ========================================================= */
 
 /* TODO: Declare application-specific variables */
-
+static uint8_t application_status;
 
 /* =========================================================
  * Initialization
@@ -15,7 +14,7 @@
 void Application_Init(void)
 {
     /* TODO: Initialize application state */
-
+	application_status = ACK_STATUS_OK;
     /* TODO: Initialize application modules if necessary */
 }
 
@@ -39,39 +38,53 @@ void Application_Process(void)
  * ========================================================= */
 
 void Application_ProcessFrame(const Protocol_Frame_t *frame){
-    if (frame == NULL)  return;
+    if (frame == NULL || Protocol_ValidateFrame(frame) == 0) return;
+    uint8_t status = ACK_STATUS_OK;
 
-    uint8_t command_executed = 1U;
-    switch (frame->cmd)
-    {
+    switch (frame->cmd){
         case CMD_CLEAR:
-        	lcd_clear();
+            if (frame->len != 0U) status = ACK_STATUS_INVALID_LEN;
+            else{
+                lcd_clear();
+            }
             break;
 
         case CMD_GOTO:
-        	lcd_goto(frame->data[0],frame->data[1]);
+            if (frame->len != 2U){
+                status = ACK_STATUS_INVALID_LEN;
+            }
+            else lcd_goto(frame->data[0], frame->data[1]);
             break;
 
-        case CMD_PRINT:{
-        	char s[frame->len+1];
-        	for(int i=0;i<frame->len;i++){
-        		s[i]=(char) frame->data[i];
-        	}
-        	s[frame->len]='\0';
-        	lcd_print(s);
+        case CMD_PRINT:
+            if (frame->len > PROTOCOL_DATA_SIZE) {
+                status = ACK_STATUS_INVALID_LEN;
+            }
+            else {
+                char print_buffer[PROTOCOL_DATA_SIZE + 1U];
+
+                for (uint8_t i = 0U; i < frame->len; i++){
+                    print_buffer[i] = (char)frame->data[i];
+                }
+
+                print_buffer[frame->len] = '\0';
+                lcd_print(print_buffer);
+            }
             break;
-        }
+
         default:
-                command_executed = 0U;
+            status = ACK_STATUS_INVALID_CMD;
             break;
     }
 
-        if (command_executed != 0U)
-        {
-            Protocol_Frame_t ack_frame;
-            uint8_t ack_data[2] = {frame->cmd, ACK_STATUS_OK};
+    /* =====================================================
+     * ACK Response
+     * ===================================================== */
 
-            Protocol_InitFrame(&ack_frame, CMD_ACK, frame->seq, 2U, ack_data);
-            (void)Communication_Send(&ack_frame);
-        }
+    Protocol_Frame_t ack_frame;
+
+    uint8_t ack_data[2] ={frame->cmd,status};
+
+    Protocol_InitFrame(&ack_frame,CMD_ACK,frame->seq,2U,ack_data);
+    Communication_Send(&ack_frame);
 }

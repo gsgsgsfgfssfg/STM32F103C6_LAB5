@@ -1,5 +1,7 @@
 #include "cli.h"
 
+extern UART_HandleTypeDef huart2;
+
 static char cli_buffer[CLI_BUFFER_SIZE];
 static uint8_t cli_length;
 static uint8_t cli_line_ready;
@@ -7,17 +9,7 @@ static uint8_t cli_line_ready;
 #define BACKSPACE 0x08
 #define ENTER 0x0D
 
-typedef enum
-{
-    CLI_CMD_INVALID,
-    CLI_CMD_CLEAR,
-    CLI_CMD_GOTO,
-    CLI_CMD_PRINT,
-    CLI_CMD_HELP
-} CLI_CommandType;
-
-typedef struct
-{
+typedef struct{
     CLI_CommandType type;
 
     uint8_t row;
@@ -25,9 +17,9 @@ typedef struct
 
     char text[CLI_BUFFER_SIZE];
 } CLI_Command;
+static CLI_State_t cli_state;
 
-static const char* skipSpaces(const char *p)
-{
+static const char* skipSpaces(const char *p){
     while (*p == ' '){
         p++;
     }
@@ -35,8 +27,7 @@ static const char* skipSpaces(const char *p)
     return p;
 }
 
-static uint8_t parseNumber(const char **p, uint8_t *value)
-{
+static uint8_t parseNumber(const char **p, uint8_t *value){
     uint16_t result = 0;
     uint8_t digit_found = 0;
 
@@ -56,8 +47,7 @@ static uint8_t parseNumber(const char **p, uint8_t *value)
     *value = (uint8_t)result;
     return 1;
 }
-uint8_t CLI_Parse(const char *input, CLI_Command *cmd)
-{
+uint8_t CLI_Parse(const char *input, CLI_Command *cmd){
     const char *p = input;
 
     // Reset parsed command
@@ -152,29 +142,32 @@ void CLI_Execute(CLI_Command *cmd){
         case CLI_CMD_CLEAR:
             //lcd_clear();
         	Protocol_InitFrame(&frame,CMD_CLEAR,0,0,NULL);
-        	Communication_Send(&frame);
+        	Communication_Submit(&frame);
             break;
 
         case CLI_CMD_GOTO:{
             //lcd_goto(cmd->col, cmd->row);
         	uint8_t data[2] = {cmd->col,cmd->row};
         	Protocol_InitFrame(&frame,CMD_GOTO,0,2,data);
-        	Communication_Send(&frame);
+        	Communication_Submit(&frame);
             break;
         }
         case CLI_CMD_PRINT:
             //lcd_print(cmd->text);
         	Protocol_InitFrame(&frame,CMD_PRINT,0,strlen(cmd->text),(uint8_t*)cmd->text);
-        	Communication_Send(&frame);
+        	Communication_Submit(&frame);
             break;
 
         case CLI_CMD_HELP:
             // TODO: Send help text to UART
             break;
 
-        default:
+        default:{
             // Invalid command
+	        const char msg[] = "Not found command\r\n";
+	        HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, 100);
             break;
+        }
     }
 }
 
@@ -186,9 +179,12 @@ void CLI_Init(void){
 	cli_buffer[0] = '\0';
 	cli_length = 0;
 	cli_line_ready = 0;
+	cli_state = CLI_STATE_IDLE;
+    const char start = '>';
+    HAL_UART_Transmit_IT(&huart2, (uint8_t *)&start, 1);
 }
-void CLI_ProcessByte(uint8_t byte)
-{
+void CLI_ProcessByte(uint8_t byte){
+	if (cli_state == CLI_STATE_BUSY) return;
     if (cli_line_ready) return;
 
     if (byte == BACKSPACE)
@@ -219,22 +215,35 @@ void CLI_ProcessByte(uint8_t byte)
     cli_length++;
     cli_buffer[cli_length] = '\0';
 }
-void CLI_Process(void)
-{
+void CLI_Process(void){
+	if (cli_state == CLI_STATE_BUSY){
+		Communication_Result_t comm_res = Communication_GetResult();
+		if (comm_res == COMM_RESULT_PENDING) return;
+		cli_state = CLI_STATE_IDLE;
+		if (comm_res == COMM_RESULT_SUCCESS){
+	        const char msg[] = "Done!\r\n";
+	        HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, 100);
+		} else {
+	        const char msg[] = "Fail!\r\n";
+	        HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, 100);
+		}
+	    const char start = '>';
+	    HAL_UART_Transmit_IT(&huart2, (uint8_t *)&start, 1);
+		return;
+	}
+
     if (!cli_line_ready) return;
 
-    // cli_buffer now contains a complete command
-
-    // TODO: Parse command
     CLI_Command cmd;
-    // TODO: Execute command
-    if (CLI_Parse(cli_buffer, &cmd)) CLI_Execute(&cmd);
+    if (CLI_Parse(cli_buffer, &cmd) == 1) {
+    	cli_state = CLI_STATE_BUSY;
+    	CLI_Execute(&cmd);
+    }
     else{
         const char error[] = "Syntax error\r\n";
-
-        //HAL_UART_Transmit(&huart2, (uint8_t *)error, sizeof(error) - 1, 100);
+        HAL_UART_Transmit(&huart2, (uint8_t *)error, sizeof(error) - 1, 100);
     }
-    // TODO: Reset input buffer
+
     cli_buffer[0] = '\0';
     cli_length = 0;
     cli_line_ready = 0;

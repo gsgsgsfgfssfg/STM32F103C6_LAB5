@@ -89,6 +89,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  Application_Init();
   lcd_init(16, 2);
   lcd_clear();
   lcd_goto(0, 0);
