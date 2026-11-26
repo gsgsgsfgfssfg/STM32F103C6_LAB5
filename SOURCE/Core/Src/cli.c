@@ -3,11 +3,23 @@
 extern UART_HandleTypeDef huart2;
 
 static char cli_buffer[CLI_BUFFER_SIZE];
-static uint8_t cli_length;
-static uint8_t cli_line_ready;
+static volatile uint8_t cli_length;
+static volatile uint8_t cli_line_ready;
+static volatile CLI_State_t cli_state;
 
 #define BACKSPACE 0x08
 #define ENTER 0x0D
+
+static void CLI_Transmit(const char *data, uint16_t length){
+    uint32_t start_tick = HAL_GetTick();
+
+    while (huart2.gState != HAL_UART_STATE_READY && (HAL_GetTick() - start_tick) < 100U) {
+    }
+
+    if (huart2.gState == HAL_UART_STATE_READY) {
+        HAL_UART_Transmit(&huart2, (uint8_t *)data, length, 100);
+    }
+}
 
 typedef struct{
     CLI_CommandType type;
@@ -17,7 +29,6 @@ typedef struct{
 
     char text[CLI_BUFFER_SIZE];
 } CLI_Command;
-static CLI_State_t cli_state;
 
 static const char* skipSpaces(const char *p){
     while (*p == ' '){
@@ -83,7 +94,7 @@ uint8_t CLI_Parse(const char *input, CLI_Command *cmd){
         return 1;
     }
 
-    // Command: goto ROW COL
+    // Command: goto COL ROW
     if (strncmp(p, "goto", 4) == 0 && p[4] == ' ') {
         p += 4;
         if (!parseNumber(&p, &cmd->col)) return 0;
@@ -158,14 +169,20 @@ void CLI_Execute(CLI_Command *cmd){
         	Communication_Submit(&frame);
             break;
 
-        case CLI_CMD_HELP:
+        case CLI_CMD_HELP:{
             // TODO: Send help text to UART
+        	const char msg1[] = "- clear: clear the LCD screen\r\n";
+        	const char msg2[] = "- goto [col] [row]: go to the position on LCD screen\r\n";
+        	const char msg3[] = "- print [text]: print the text to the LCD screen \r\n";
+            	CLI_Transmit(msg1, sizeof(msg1) - 1);
+            	CLI_Transmit(msg2, sizeof(msg2) - 1);
+            	CLI_Transmit(msg3, sizeof(msg3) - 1);
             break;
-
+        }
         default:{
             // Invalid command
 	        const char msg[] = "Not found command\r\n";
-	        HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, 100);
+            CLI_Transmit(msg, sizeof(msg) - 1);
             break;
         }
     }
@@ -180,8 +197,6 @@ void CLI_Init(void){
 	cli_length = 0;
 	cli_line_ready = 0;
 	cli_state = CLI_STATE_IDLE;
-    const char start = '>';
-    HAL_UART_Transmit_IT(&huart2, (uint8_t *)&start, 1);
 }
 void CLI_ProcessByte(uint8_t byte){
 	if (cli_state == CLI_STATE_BUSY) return;
@@ -222,26 +237,23 @@ void CLI_Process(void){
 		cli_state = CLI_STATE_IDLE;
 		if (comm_res == COMM_RESULT_SUCCESS){
 	        const char msg[] = "Done!\r\n";
-	        HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, 100);
+            	CLI_Transmit(msg, sizeof(msg) - 1);
 		} else {
 	        const char msg[] = "Fail!\r\n";
-	        HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, 100);
+            	CLI_Transmit(msg, sizeof(msg) - 1);
 		}
-	    const char start = '>';
-	    HAL_UART_Transmit_IT(&huart2, (uint8_t *)&start, 1);
 		return;
 	}
 
     if (!cli_line_ready) return;
-
     CLI_Command cmd;
     if (CLI_Parse(cli_buffer, &cmd) == 1) {
-    	cli_state = CLI_STATE_BUSY;
+    	if (cmd.type != CLI_CMD_HELP) cli_state = CLI_STATE_BUSY;
     	CLI_Execute(&cmd);
     }
     else{
         const char error[] = "Syntax error\r\n";
-        HAL_UART_Transmit(&huart2, (uint8_t *)error, sizeof(error) - 1, 100);
+        CLI_Transmit(error, sizeof(error) - 1);
     }
 
     cli_buffer[0] = '\0';
